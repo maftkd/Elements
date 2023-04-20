@@ -5,34 +5,60 @@ using UnityEngine.UI;
 
 public class MTerrain : MonoBehaviour
 {
-    [Range(1, 1000)]
+    public Material terrainMat;
+
+    [Range(1, 2000)]
     public float size;
     [Range(2, 128)]
     public int resolution;
     float [] heightmap;
     [SerializeField]
-    [Range(0, 10)]
+    [Range(0, 1)]
     private float noiseMult;
+    [SerializeField]
+    [Range(0, 40)]
+    private float noiseAmp;
 
     MeshFilter meshFilter;
     MeshRenderer meshRenderer;
 
-    public Material terrainMat;
 
-    [SerializeField]
-    private Slider noiseMultSlider;
-    [SerializeField]
-    private Slider sizeSlider;
-    [SerializeField]
-    private Slider resolutionSlider;
+    [Range(-20f, 10f)]
+    public float minHeight;
+    [Range(-10f, 10f)]
+    public float maxHeight;
+
+    [Range(0f, 1f)]
+    public float slopeStart;
+    [Range(0f, 1f)]
+    public float slopeEnd;
+
+
+    void OnValidate() {
+        if(Application.isPlaying) {
+            Regenerate();
+            Debug.Log("Regenerating");
+        }
+    }
 
     void GenerateHeightmap(){
         heightmap = new float[resolution * resolution];
+        Vector4 bounds = GetBounds();
         for(int y = 0; y < resolution; y++){
+            float y01 = y / (float) (resolution - 1);
             for(int x = 0; x < resolution; x++){
+                float x01 = x / (float) (resolution - 1);
                 int index = y * resolution + x;
-                float perlin = Mathf.PerlinNoise(x * noiseMult, y * noiseMult);
-                heightmap[index] = perlin;
+                float perlin01 = Mathf.PerlinNoise(x * noiseMult, y * noiseMult);
+                float perlin = Mathf.Lerp(-1f, 1f, perlin01) *  noiseAmp;
+                float xPos = Mathf.Lerp(bounds.x, bounds.z, x01);
+                float zPos = Mathf.Lerp(bounds.y, bounds.w, y01);
+                float dist = (new Vector2(xPos, zPos) - Vector2.down * size * 0.5f).magnitude;
+                float distNorm = dist/ (size * 0.5f);
+                float height01 = MSmoothStep(slopeStart, slopeEnd, distNorm);
+                perlin = Mathf.Lerp(0, perlin, height01);
+                float height = Mathf.Lerp(maxHeight, minHeight,  height01);
+                heightmap[index] = height + perlin;
             }
         }
     }
@@ -128,28 +154,19 @@ public class MTerrain : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        //setup ui
-        noiseMultSlider.value = noiseMult;
-        sizeSlider.value = size;
-        resolutionSlider.value = resolution;
-
+        Camera.main.depthTextureMode = DepthTextureMode.Depth;
         //initial generation
         Regenerate();
     }
 
-    public void SetNoiseMult(Slider slider) {
-        noiseMult = slider.value;
-        Regenerate();
+    public static float MSmoothStep(float a, float b, float x)
+    {
+        float t = MSaturate((x - a)/(b - a));
+        return (float) (t*t*(3.0 - (2.0*t)));
     }
 
-    public void SetSize(Slider slider) {
-        size = slider.value;
-        Regenerate();
-    }
-
-    public void SetResolution(Slider slider) {
-        resolution = (int) slider.value;
-        Regenerate();
+    public static float MSaturate(float a) {
+        return Mathf.Clamp(a, 0f, 1f);
     }
 
 }
