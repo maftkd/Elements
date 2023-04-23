@@ -2,7 +2,7 @@ Shader "Unlit/Terrain"
 {
     Properties
     {
-        _MainTex ("Texture", 2D) = "white" {}
+        _Color ("Color", Color) = (1,1,1,1)
     }
     SubShader
     {
@@ -11,6 +11,7 @@ Shader "Unlit/Terrain"
 
         Pass
         {
+            ZWrite On
             CGPROGRAM
             #pragma vertex vert
             #pragma fragment frag
@@ -32,14 +33,13 @@ Shader "Unlit/Terrain"
                 float4 vertex : SV_POSITION;
             };
 
-            sampler2D _MainTex;
-            float4 _MainTex_ST;
+            fixed4 _Color;
 
             v2f vert (appdata v)
             {
                 v2f o;
                 o.vertex = UnityObjectToClipPos(v.vertex);
-                o.uv = TRANSFORM_TEX(v.uv, _MainTex);
+                o.uv = v.uv;
                 UNITY_TRANSFER_FOG(o,o.vertex);
                 return o;
             }
@@ -47,10 +47,37 @@ Shader "Unlit/Terrain"
             fixed4 frag (v2f i) : SV_Target
             {
                 // sample the texture
-                fixed4 col = fixed4(i.uv, 0, 1);
+                fixed4 col = _Color;
                 // apply fog
                 UNITY_APPLY_FOG(i.fogCoord, col);
                 return col;
+            }
+            ENDCG
+        }
+        Pass
+        {
+            Tags {"LightMode"="ShadowCaster"}
+ 
+            CGPROGRAM
+            #pragma vertex vert
+            #pragma fragment frag
+            #pragma multi_compile_shadowcaster
+            #include "UnityCG.cginc"
+ 
+            struct v2f {
+                V2F_SHADOW_CASTER;
+            };
+ 
+            v2f vert(appdata_base v)
+            {
+                v2f o;
+                TRANSFER_SHADOW_CASTER_NORMALOFFSET(o)
+                return o;
+            }
+ 
+            float4 frag(v2f i) : SV_Target
+            {
+                SHADOW_CASTER_FRAGMENT(i)
             }
             ENDCG
         }
